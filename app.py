@@ -10,7 +10,6 @@ pages = ["Chatbot", "General Data", "User Engagement", "User Review", "Ticket"]
 logo = Image.open("logo (6).png")
 resized_logo = logo.resize((200, 80), Image.LANCZOS)
 
-engage_sheets = "https://docs.google.com/spreadsheets/d/1RlVREvEv4ibSHWHr1I0Jr_u0FiVcsPEVP4DXsdy44GM/edit?usp=sharing"
 review_sheets = "https://docs.google.com/spreadsheets/d/1R7uDimwO0w6UZmKrbklgOHfueik9AEAaXPifBR6VeDI/edit?usp=sharing"
 
 with st.sidebar:
@@ -101,23 +100,8 @@ elif selected_page == "User Review":
   st.markdown("This data is a collection of user testimonials with their sentiments on the product.")
   
   conn = st.connection("gsheets", type=GSheetsConnection)
-  review = conn.read(worksheet="Reviews", usecols=list(range(4)))
-
-  st.subheader("User Sentiment")
-  sql = '''
-  SELECT
-    "Reviews",
-    "Sentiment",
-    "Sub"
-  FROM
-    Reviews
-  WHERE
-    "Sentiment" = 'Negative'
-  ORDER BY
-    "Reviews";
-  '''
-  df_sentiment = conn.query(sql=sql)
-  st.dataframe(df_sentiment)
+  review = conn.read(spreadsheet=review_sheets, usecols = list(range(4)))
+  st.dataframe(review)
 
 elif selected_page == "Ticket":
   st.title("Ticket")
