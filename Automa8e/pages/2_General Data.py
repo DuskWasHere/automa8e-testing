@@ -26,7 +26,7 @@ def setup_ui():
     # Assuming the logo is not too wide, adjust the width as needed
     with col1:
         logo = Image.open("images/logo (6).png")
-        st.image(logo, width=100)
+        st.image(logo, width=200)
 
     # Place the title and subtitle in the middle column
     with col2:
