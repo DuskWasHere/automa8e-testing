@@ -2,30 +2,45 @@ from PIL import Image
 import pandas as pd
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
+from utils.google_sheets import handle_data_refresh
 
+# Set page configuration
 st.set_page_config(page_title="Automa8e", layout="wide", page_icon="images\page icon.png")
 
-# Load logo
-logo = Image.open("images\logo (6).png")
-st.image(logo, width=250)
-
-# Define function to fetch data from Google Sheets for "Feedback" sheet
-@st.cache_data()
+# Function to fetch data and cache it
+@st.cache_data(ttl=300)
 def fetch_data():
     conn = st.connection("gsheets", type=GSheetsConnection)
     df = conn.read(worksheet="Feedback", usecols=list(range(2)))
     return df
 
-# Define function to fetch data from Google Sheets for "UserEngagement" sheet
-@st.cache_data()
+# Function to fetch data and cache it
+@st.cache_data(ttl=300)
 def get_data():
     conn = st.connection("gsheets", type=GSheetsConnection)
     df = conn.read(worksheet="UserEngagement")
     return df
 
-# Main body
-st.title("User Engagement")
-st.markdown("_This data is a collection of user engagements to gauge unanswered queries._")
+def setup_ui():
+    # Use Streamlit columns to layout the logo and the title + subtitle
+    col1, col2, col3 = st.columns([1, 3, 1])
+
+    # Assuming the logo is not too wide, adjust the width as needed
+    with col1:
+        logo = Image.open("images/logo (6).png")
+        st.image(logo, width=100)
+
+    # Place the title and subtitle in the middle column
+    with col2:
+        st.markdown("""
+            <h1 style='text-align: center;'>User Engagement</h1>
+            <p style='text-align: center;'>This data is a collection of user engagements to gauge unanswered queries.</p>
+        """, unsafe_allow_html=True)
+
+    # The third column is used to balance the layout. No content needed.
+setup_ui()
+
+handle_data_refresh()
 
 # Fetch data
 engage = fetch_data()

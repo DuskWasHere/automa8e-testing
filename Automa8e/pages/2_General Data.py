@@ -3,75 +3,109 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from streamlit_gsheets import GSheetsConnection
+from utils.google_sheets import handle_data_refresh
 
-st.set_page_config(page_title="Automa8e", layout="wide", page_icon="images\page icon.png")
+# Set page configuration
+st.set_page_config(page_title="Automa8e", layout="wide", page_icon="images/page_icon.png")
 
-# logo
-logo = Image.open("images\logo (6).png")
-st.image(logo, width=250)
+# Data fetching with error handling and caching
+@st.cache_data(show_spinner=False)
+def fetch_data(worksheet, usecols=None):
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        data = conn.read(worksheet=worksheet, usecols=usecols)
+        return data
+    except Exception as e:
+        st.error(f"Failed to fetch data: {e}")
+        return pd.DataFrame()
 
-# Define function to fetch data from Google Sheets for "Feedback" sheet
-@st.cache_data()
-def fetch_data():
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(worksheet="Feedback", usecols=list(range(2)))
-    return df
+def setup_ui():
+    # Use Streamlit columns to layout the logo and the title + subtitle
+    col1, col2, col3 = st.columns([1, 3, 1])
 
-# Define function to fetch data from Google Sheets for "UserEngagement" sheet
-@st.cache_data()
-def get_data():
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(worksheet="UserEngagement")
-    return df
+    # Assuming the logo is not too wide, adjust the width as needed
+    with col1:
+        logo = Image.open("images/logo (6).png")
+        st.image(logo, width=100)
 
-# Main body
-st.title("General Data")
-st.markdown("_Visual Representation of Data Analytics_")
+    # Place the title and subtitle in the middle column
+    with col2:
+        st.markdown("""
+            <h1 style='text-align: center;'>General Data Insights</h1>
+            <p style='text-align: center;'>Interactive visual representation of data analytics.</p>
+        """, unsafe_allow_html=True)
 
-# Fetch data
-engage = fetch_data()
-kb = get_data()
+    # The third column is used to balance the layout. No content needed.
 
-# Filter data for "Needs Fixing" and "Answered" queries
-df_needs_fixing = engage[engage["Answer Quality"] == "Needs Fixing"]
-df_answered = engage[engage["Answer Quality"] == "Answered"]
+handle_data_refresh()
 
-# Prepare data for knowledge base count
-kb_main_chart_data = kb["Main "].value_counts().reset_index()
-kb_main_chart_data.columns = ["Main ", "Count"]
+def main():
+    setup_ui()
 
-kb_sub_chart_data = kb["Sub"].value_counts().reset_index()
-kb_sub_chart_data.columns = ["Sub", "Count"]
+    # Fetching data
+    feedback_data = fetch_data("Feedback", usecols=list(range(2)))
+    engagement_data = fetch_data("UserEngagement")
+    # Assuming you have a way to fetch review_data
+    review_data = fetch_data("Review")
 
-container = st.container()
-left_col, right_col = container.columns(2)
+    # Preparing data
+    feedback_summary = feedback_data["Answer Quality"].value_counts().reset_index(name='Count')
+    engagement_main_summary = engagement_data["Main "].value_counts().reset_index(name='Count')
+    engagement_sub_summary = engagement_data["Sub"].value_counts().reset_index(name='Count')
+    # Prepare your review data
+    # Filter review_data for "Sub" being "Negative" or "Positive" and then prepare the summary
+    filtered_review_summary = review_data[review_data['Sub'].isin(['Negative', 'Positive'])]
 
-with left_col:
-    # Bar chart for user queries
-    st.subheader("User Queries")
-    user_chart_data = pd.concat([df_needs_fixing, df_answered]).groupby("Answer Quality").size().reset_index(name="Count")
-    user_chart = alt.Chart(user_chart_data).mark_bar().encode(
-        x='Answer Quality',
-        y='Count',
-        tooltip=['Answer Quality', 'Count'],
-    )
-    st.altair_chart(user_chart, use_container_width=True)
+    # Group by "Main" and "Sub" to get counts
+    review_summary = filtered_review_summary.groupby(['Main', 'Sub']).size().reset_index(name='Count')
 
-with right_col:
-    # Bar chart for Main column of UserEngagement
-    st.subheader("User Engagement - Main")
-    main_chart = alt.Chart(kb_main_chart_data).mark_bar().encode(
-        x='Main ',
-        y='Count',
-        tooltip=['Main ', 'Count'],
-    )
-    st.altair_chart(main_chart, use_container_width=True)
 
-    # Bar chart for Sub column of UserEngagement
-    st.subheader("User Engagement - Sub")
-    sub_chart = alt.Chart(kb_sub_chart_data).mark_bar().encode(
-        x='Sub',
-        y='Count',
-        tooltip=['Sub', 'Count'],
-    )
-    st.altair_chart(sub_chart, use_container_width=True)
+    # Row 1: Feedback Summary and Positive/Negative Reviews Visualization
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Feedback Summary")
+        feedback_chart = alt.Chart(feedback_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Answer Quality'),
+            y=alt.Y('Count:Q', title='Count'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Feedback Overview")
+        st.altair_chart(feedback_chart, use_container_width=True)
+
+    with col2:
+        st.subheader("Review Summary by Sentiment and Sub Categories")
+        review_chart = alt.Chart(review_summary).mark_bar().encode(
+            x=alt.X('Main:N', title='Sub Category'),
+            y=alt.Y('Count:Q', title='Number of Reviews'),
+            color=alt.Color('Sub:N', legend=alt.Legend(title="Sentiment")),
+            tooltip=['Main', 'Sub', 'Count']
+        ).interactive().properties(title="Reviews Overview")
+        st.altair_chart(review_chart, use_container_width=True)
+
+    # Row 2: User Engagement - Main Categories Visualization
+    col1, _ = st.columns(2)
+    with col1:
+        st.subheader("User Engagement - Main Categories")
+        main_chart = alt.Chart(engagement_main_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Sub Category'),
+            y=alt.Y('Count:Q', title='Frequency'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Main Categories Distribution")
+        st.altair_chart(main_chart, use_container_width=True)
+
+    # Row 3: User Engagement - Sub Categories Visualization
+    col1, _ = st.columns(2)
+    with col1:
+        st.subheader("User Engagement - Sub Categories")
+        sub_chart = alt.Chart(engagement_sub_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Sub Category'),
+            y=alt.Y('Count:Q', title='Frequency'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Sub Categories Distribution")
+        st.altair_chart(sub_chart, use_container_width=True)
+
+if __name__ == "__main__":
+    main()

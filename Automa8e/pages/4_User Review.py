@@ -2,96 +2,73 @@ from PIL import Image
 import pandas as pd
 import streamlit as st
 import altair as alt
-import time
-from utils.google_sheets import fetch_data_from_sheet
+from streamlit_gsheets import GSheetsConnection
+from utils.google_sheets import handle_data_refresh
 
 # Set page configuration
-st.set_page_config(page_title="Automa8e", layout="wide", page_icon="images\page icon.png")
+st.set_page_config(page_title="User Reviews - Automa8e", layout="wide", page_icon="images/page_icon.png")
 
-# Load logo
-logo = Image.open("images\logo (6).png")
-
-# Main body
-st.image(logo, width=250)
-st.title("User Review")
-st.markdown("_This data is a collection of user testimonials with their sentiments on the product._")
-
-# Define function to fetch data from Google Sheets
+# Function to fetch data and cache it
 @st.cache_data(ttl=300)
 def fetch_data():
-    return fetch_data_from_sheet("Review", usecols=list(range(4)))
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    data = conn.read(worksheet="Review")
+    return data
 
-# Initialize a session state variable to track refresh action
-if 'refresh' not in st.session_state:
-    st.session_state.refresh = False
+def setup_ui():
+    # Use Streamlit columns to layout the logo and the title + subtitle
+    col1, col2, col3 = st.columns([1, 3, 1])
 
-# Sidebar button for data refresh
-if st.button("Refresh Data"):
-    # Toggle the refresh state to True when the button is clicked
-    st.session_state.refresh = not st.session_state.refresh
+    # Assuming the logo is not too wide, adjust the width as needed
+    with col1:
+        logo = Image.open("images/logo (6).png")
+        st.image(logo, width=100)
 
-# Check if the refresh action is True, and if so, rerun the app
-if st.session_state.refresh:
-    st.experimental_memo.clear()  # Clear cached data
-    st.session_state.refresh = False  # Reset the refresh state to avoid recursion
-    st.experimental_rerun()  # Rerun the app to refresh data
+    # Place the title and subtitle in the middle column
+    with col2:
+        st.markdown("""
+            <h1 style='text-align: center;'>User Reviews - Insights</h1>
+            <p style='text-align: center;'>Explore user sentiments and feedback on our product.</p>
+        """, unsafe_allow_html=True)
 
-# Fetch data
-review = fetch_data()
+    # The third column is used to balance the layout. No content needed.
+setup_ui()
 
-# Filter Data
-positive_kb = review[review['Sub'] == 'Positive']
-negative_kb = review[review['Sub'] == 'Negative']
+handle_data_refresh()
 
-# Define all subcategories you want to display
-positive_subcategories = [
-    "Satisfaction", "Delight", "Excitement", "Appreciation"
-]
+# Create bar charts for reviews with Altair
+def create_review_chart(data, title):
+    chart_data = data.groupby("Main").size().reset_index(name="Count")
+    chart = alt.Chart(chart_data).mark_bar().encode(
+        x=alt.X('Main', sort='-y'),
+        y='Count',
+        color='Main',
+        tooltip=['Main', 'Count'],
+    ).properties(title=title, width=350)
+    return chart
 
-negative_subcategories = [
-    "Anger", "Frustration", "Confusion", "Disappointment"
-]
+# Fetching data
+reviews = fetch_data()
 
-# Group by 'Sub' column and count occurrences, ensuring all subcategories are present
-positive_category_counts = positive_kb['Main'].value_counts().reindex(positive_subcategories, fill_value=0)
-negative_category_counts = negative_kb['Main'].value_counts().reindex(negative_subcategories, fill_value=0)
+# Layout adjustments for reviews
+col1, col2 = st.columns([1.1, 1])
 
-# Convert to DataFrame for plotting
-df_positive_category_counts = pd.DataFrame(positive_category_counts).reset_index()
-df_positive_category_counts.columns = ['Main', 'Count']
+with col1:
+    st.subheader("Detailed Reviews")
+    # Use of expander for detailed review visualization
+    with st.expander("See Positive Reviews"):
+        positive_reviews = reviews[reviews["Sub"] == "Positive"]
+        st.dataframe(positive_reviews[['Reviews', 'Sub', 'Main']], height=300, width=1500)
 
-df_negative_category_counts = pd.DataFrame(negative_category_counts).reset_index()
-df_negative_category_counts.columns = ['Main', 'Count']
+    with st.expander("See Negative Reviews"):
+        negative_reviews = reviews[reviews["Sub"] == "Negative"]
+        st.dataframe(negative_reviews[['Reviews', 'Sub', 'Main']], height=300, width=1500)
 
-container = st.container()
-left_col, right_col = container.columns(2)
+# Display charts with enhanced customization
+with col2:
+    st.subheader("Review Analysis")
+    pos_chart = create_review_chart(positive_reviews, "Positive Reviews Overview")
+    neg_chart = create_review_chart(negative_reviews, "Negative Reviews Overview")
 
-with left_col:
-    filtered = ["Reviews", "Sub", "Main"]
-
-    # Positive Reviews
-    st.subheader("Positive Reviews")
-    df_pos = review[review["Sub"] == "Positive"][filtered]
-    st.dataframe(df_pos, use_container_width=True)
-    
-    # Negative Reviews
-    st.subheader("Negative Reviews")
-    df_neg = review[review["Sub"] == "Negative"][filtered]
-    st.dataframe(df_neg, use_container_width=True)
-
-with right_col:
-    # Bar chart for positive reviews
-    st.subheader("Positive Reviews")
-    positive = alt.Chart(df_positive_category_counts).mark_bar().encode(
-        x='Main',
-        y='Count'
-    )
-    st.altair_chart(positive, use_container_width=True)
-
-    # Bar chart for negative reviews
-    st.subheader("Negative Reviews")
-    negative = alt.Chart(df_negative_category_counts).mark_bar().encode(
-        x='Main',
-        y='Count'
-    )
-    st.altair_chart(negative, use_container_width=True)
+    st.altair_chart(pos_chart, use_container_width=True)
+    st.altair_chart(neg_chart, use_container_width=True)
