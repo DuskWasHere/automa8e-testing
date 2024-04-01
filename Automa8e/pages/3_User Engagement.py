@@ -98,72 +98,89 @@ with col2:
     ).interactive().properties(title="Sub Categories Distribution")
     st.altair_chart(sub_chart, use_container_width=True)
     
+# Function to fetch all data from a Google Sheet
 def fetch_all_data_from_gsheets(worksheet):
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        # Fetch all data without specifying columns to ensure we get the entire sheet.
         data = conn.read(worksheet=worksheet)
         return data
     except Exception as e:
         st.error(f"Failed to fetch data: {e}")
         return pd.DataFrame()
 
-# Fetch all data from your specific worksheet
+# Initialization for Google Sheets connection
+if 'gsheets_connection' not in st.session_state:
+    st.session_state.gsheets_connection = st.connection("gsheets", type=GSheetsConnection)
+
+# Fetch all data from the 'UserEngagement' worksheet
 data = fetch_all_data_from_gsheets('UserEngagement')
 
 # Adjust here to select columns A, B, C, D based on zero-based index positions
-columns_of_interest = data.iloc[:, 0:4]  # Now correctly selects columns A, B, C, D
+columns_of_interest = data.iloc[:, 0:4]  # Selects columns A, B, C, D
 
-# Renaming columns for clarity based on your latest correction
+# Renaming columns for clarity
 columns_of_interest.columns = ['Question', 'Response', 'Main', 'Sub']
 
-# Filter out columns that are completely empty
+# Filtering out completely empty columns
 columns_of_interest = columns_of_interest.dropna(axis=1, how='all')
 
-# Sort the DataFrame based on the 'Main' column for visual grouping
+# Filtering for populated rows to ensure cleanliness
 columns_of_interest = columns_of_interest.dropna(subset=['Question', 'Response', 'Main', 'Sub'], how='all')
 
-# Now, display the DataFrame with only populated rows
-st.subheader("User Engagement Data")
-st.dataframe(columns_of_interest, use_container_width=True)
+# Sidebar widget for filtering by Main category
+main_categories = columns_of_interest['Main'].dropna().unique()  # Drop NaN values to avoid float issues
+main_categories = [str(category) for category in main_categories]  # Convert all categories to strings
+selected_main_category = st.sidebar.selectbox(
+    'Select a Main Category:',
+    ['All'] + sorted(main_categories),  # Now sorting a list of strings
+    key='main_category_filter'
+)
 
+# Apply filter based on sidebar selection
+if selected_main_category != 'All':
+    filtered_data = columns_of_interest[columns_of_interest['Main'] == selected_main_category]
+else:
+    filtered_data = columns_of_interest
 
-# Filter functionality
+# Sort filtered_data by 'Main' frequency before displaying
+main_frequency = filtered_data['Main'].value_counts().to_frame().reset_index()
+main_frequency.columns = ['Main', 'Frequency']
+sorted_filtered_data = filtered_data.merge(main_frequency, on='Main', how='left').sort_values('Frequency', ascending=False).drop('Frequency', axis=1)
+
+# Display the DataFrame with filtered rows
+st.subheader(f"User Engagement Data - {selected_main_category if selected_main_category != 'All' else 'All Categories'}")
+st.dataframe(sorted_filtered_data, use_container_width=True)
+
 def adjust_column_name(df, partial_name):
+    """Adjust column names based on partial match."""
     for col in df.columns:
         if partial_name.lower() in col.lower():
             return col
-    return partial_name  # Fallback to the original if not found
+    return partial_name
 
-main_col_name = adjust_column_name(engagement_data, "Main")
-sub_col_name = adjust_column_name(engagement_data, "Sub")
-
-# Sidebar widget for filtering by Main category
-main_categories = engagement_data[main_col_name].unique()
-selected_main_category = st.sidebar.selectbox('Select a Main Category:', ['All'] + list(main_categories))
-
-def display_filtered_data(engagement_data, selected_main_category):
-    if selected_main_category != 'All':
-        filtered_data = engagement_data[engagement_data[main_col_name] == selected_main_category]
-    else:
-        filtered_data = engagement_data
-
-    # Group by "Main" category after filtering
-    main_categories = filtered_data.groupby(main_col_name)[sub_col_name].value_counts().unstack().fillna(0)
-
-    for main_category in main_categories.index:
-        st.subheader(f"{main_category}: Total({main_categories.loc[main_category].sum()})")
+# Utilize filtered_data for visualizations and further processing
+def display_filtered_data(filtered_data):
+    """Display filtered data visualizations."""
+    if not filtered_data.empty:
+        main_col_name = adjust_column_name(filtered_data, "Main")
+        sub_col_name = adjust_column_name(filtered_data, "Sub")
         
-        sub_category_data = pd.DataFrame(main_categories.loc[main_category]).reset_index()
-        sub_category_data.columns = ['Sub Category', 'Count']
+        # Group by "Main" category after filtering
+        main_categories_summary = filtered_data.groupby(main_col_name)[sub_col_name].value_counts().unstack().fillna(0)
 
-        sub_chart = alt.Chart(sub_category_data).mark_bar().encode(
-            x='Sub Category',
-            y='Count',
-            color='Sub Category',
-            tooltip=['Sub Category', 'Count']
-        ).interactive().properties(title=f"{main_category} - Sub Categories Distribution")
-        st.altair_chart(sub_chart, use_container_width=True)
+        for main_category in main_categories_summary.index:
+            st.subheader(f"{main_category}: Total({main_categories_summary.loc[main_category].sum()})")
+            
+            sub_category_data = pd.DataFrame(main_categories_summary.loc[main_category]).reset_index()
+            sub_category_data.columns = ['Sub Category', 'Count']
+
+            sub_chart = alt.Chart(sub_category_data).mark_bar().encode(
+                x='Sub Category:N',
+                y='Count:Q',
+                color='Sub Category:N',
+                tooltip=['Sub Category', 'Count']
+            ).interactive().properties(title=f"{main_category} - Sub Categories Distribution")
+            st.altair_chart(sub_chart, use_container_width=True)
 
 # Call the function to display filtered categories and their charts
-display_filtered_data(engagement_data, selected_main_category)
+display_filtered_data(filtered_data)
