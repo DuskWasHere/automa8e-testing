@@ -6,12 +6,23 @@ import streamlit.components.v1 as components
 import altair as alt
 from streamlit_lottie import st_lottie
 from streamlit_gsheets import GSheetsConnection
+from utils.google_sheets import handle_data_refresh
+from utils.google_sheets import handle_data_refresh
 
 st.set_page_config(page_title="Automa8e", layout = "wide", page_icon = "images\page icon.png")
 
 # logo
 logo = Image.open("images\logo (6).png")
 st.image(logo, width=250)
+
+# Function to fetch data and cache it
+@st.cache_data(ttl=300)
+def fetch_data():
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    data = conn.read(worksheet="Support")
+    return data
+  
+handle_data_refresh()
 
 # animation
 def load_anim(url):
@@ -25,7 +36,7 @@ anim = load_anim("https://lottie.host/81a6ce70-e829-4023-8394-4c659bafe651/HWw7G
 # chatbot embedding 
 def embed_chatbot():
     components.html("""
-<div style="width: 0; height: 0;" id="VG_OVERLAY_CONTAINER">
+<div style="width: 100; height: 0;" id="VG_OVERLAY_CONTAINER">
     <!-- Here is where Voiceglow renders the widget. -->
     <!-- Set render to 'full-width' then adjust the width and height to 500px (for example) to render the chatbot itself without the popup. -->
 </div>
@@ -48,18 +59,17 @@ def embed_chatbot():
         document.body.appendChild(VG_SCRIPT);
     })()
 </script>
-""", height=500, width=500)
+""", height=800, width=600)
 
 # main body
 with st.container():
   left_column, right_column = st.columns(2)
   with left_column:
-      def main():
-        st.title("Automa8e Assistant")
-        embed_chatbot()
-
-      if __name__ == "__main__":
-          main()
+    st_lottie(anim, speed=1, height=500, width=500, key="automa8e")
 
   with right_column:
-    st_lottie(anim, speed=1, height=500, width=500, key="automa8e") 
+    def main():
+        embed_chatbot()
+
+    if __name__ == "__main__":
+        main()
