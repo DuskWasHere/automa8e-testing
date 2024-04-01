@@ -133,21 +133,7 @@ def main():
             color='index:N',
             tooltip=['index', 'Count']
         ).interactive().properties(title="Sub Categories Distribution (Ticket)")
-        st.altair_chart(sub_chart, use_container_width=True)
-
-    # Row 4: Tickets
-    st.subheader("Ticket Management Data")
-    # Assuming you know the positions of the desired columns, select them directly.
-    selected_columns_data = ticket_data.iloc[:, [1, 2, 3, 4]]
-
-    # Optionally, set the column names for the selected data for clearer representation
-    selected_columns_data.columns = ['Invitee Name', 'Invitee Email', 'User Complain', 'Phone Number']
-
-    # Filter out only rows where the desired columns are all populated
-    filtered_data = filter_populated_data(selected_columns_data, ['Invitee Name', 'Invitee Email', 'User Complain', 'Phone Number'])
-
-    # Display the filtered, selected columns
-    st.dataframe(filtered_data, use_container_width=True)   
+        st.altair_chart(sub_chart, use_container_width=True) 
 
 if __name__ == "__main__":
     main()
