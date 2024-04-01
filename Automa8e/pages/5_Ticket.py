@@ -66,6 +66,9 @@ def main():
     else:
         filtered_data = support_data
 
+    # Drop rows with all NaN values
+    filtered_data = filtered_data.dropna(how='all')
+
     # Display Ticket Management - Main Categories bar graph
     main_summary = support_data["Main"].value_counts().reset_index(name='Count')
     main_chart = alt.Chart(main_summary).mark_bar().encode(
