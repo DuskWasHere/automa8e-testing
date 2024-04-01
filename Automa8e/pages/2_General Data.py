@@ -8,6 +8,9 @@ from utils.google_sheets import handle_data_refresh
 # Set page configuration
 st.set_page_config(page_title="Automa8e", layout="wide", page_icon="images/page_icon.png")
 
+logo = Image.open("images/logo (6).png")
+st.image(logo, width=200)
+
 # Data fetching with error handling and caching
 @st.cache_data(show_spinner=False)
 def fetch_data(worksheet, usecols=None):
@@ -25,19 +28,22 @@ def setup_ui():
 
     # Assuming the logo is not too wide, adjust the width as needed
     with col1:
-        logo = Image.open("images/logo (6).png")
-        st.image(logo, width=200)
+        st.write(" ")
 
     # Place the title and subtitle in the middle column
     with col2:
         st.markdown("""
             <h1 style='text-align: center;'>General Data Insights</h1>
-            <p style='text-align: center;'>Interactive visual representation of data analytics.</p>
+            <p style='text-align: center;'><em>Interactive visual representation of data analytics.</em></p>
         """, unsafe_allow_html=True)
 
     # The third column is used to balance the layout. No content needed.
 
 handle_data_refresh()
+
+def filter_populated_data(df, columns):
+    """Filter the dataframe to include only rows where specified columns are all non-empty."""
+    return df.dropna(subset=columns)
 
 def main():
     setup_ui()
@@ -47,6 +53,7 @@ def main():
     engagement_data = fetch_data("UserEngagement")
     # Assuming you have a way to fetch review_data
     review_data = fetch_data("Review")
+    ticket_data = fetch_data("Support")
 
     # Preparing data
     feedback_summary = feedback_data["Answer Quality"].value_counts().reset_index(name='Count')
@@ -58,7 +65,6 @@ def main():
 
     # Group by "Main" and "Sub" to get counts
     review_summary = filtered_review_summary.groupby(['Main', 'Sub']).size().reset_index(name='Count')
-
 
     # Row 1: Feedback Summary and Positive/Negative Reviews Visualization
     col1, col2 = st.columns(2)
@@ -83,9 +89,9 @@ def main():
         ).interactive().properties(title="Reviews Overview")
         st.altair_chart(review_chart, use_container_width=True)
 
-    # Row 2: User Engagement - Main Categories Visualization
-    col1, _ = st.columns(2)
-    with col1:
+    # Row 2: User Engagement - Main Categories Visualization and User Engagement - Sub Categories Visualization
+    c1, c2 = st.columns(2)
+    with c1:
         st.subheader("User Engagement - Main Categories")
         main_chart = alt.Chart(engagement_main_summary).mark_bar().encode(
             x=alt.X('index:N', title='Sub Category'),
@@ -95,9 +101,7 @@ def main():
         ).interactive().properties(title="Main Categories Distribution")
         st.altair_chart(main_chart, use_container_width=True)
 
-    # Row 3: User Engagement - Sub Categories Visualization
-    col1, _ = st.columns(2)
-    with col1:
+    with c2:
         st.subheader("User Engagement - Sub Categories")
         sub_chart = alt.Chart(engagement_sub_summary).mark_bar().encode(
             x=alt.X('index:N', title='Sub Category'),
@@ -106,6 +110,44 @@ def main():
             tooltip=['index', 'Count']
         ).interactive().properties(title="Sub Categories Distribution")
         st.altair_chart(sub_chart, use_container_width=True)
+        
+    # Row 3: Ticket Management - Main Categories Visualization and Ticket Management - Sub Categories Visualization
+    t1, t2 = st.columns(2)
+    with t1:
+        st.subheader("Ticket Management - Main Categories")
+        main_summary = ticket_data["Main"].value_counts().reset_index(name='Count')
+        main_chart = alt.Chart(main_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Main Category'),
+            y=alt.Y('Count:Q', title='Frequency'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Main Categories Distribution (Ticket)")
+        st.altair_chart(main_chart, use_container_width=True)
+
+    with t2:
+        st.subheader("Ticket Management - Sub Categories")
+        sub_summary = ticket_data["Sub"].value_counts().reset_index(name='Count')
+        sub_chart = alt.Chart(sub_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Sub Category'),
+            y=alt.Y('Count:Q', title='Frequency'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Sub Categories Distribution (Ticket)")
+        st.altair_chart(sub_chart, use_container_width=True)
+
+    # Row 4: Tickets
+    st.subheader("Ticket Management Data")
+    # Assuming you know the positions of the desired columns, select them directly.
+    selected_columns_data = ticket_data.iloc[:, [1, 2, 3, 4]]
+
+    # Optionally, set the column names for the selected data for clearer representation
+    selected_columns_data.columns = ['Invitee Name', 'Invitee Email', 'User Complain', 'Phone Number']
+
+    # Filter out only rows where the desired columns are all populated
+    filtered_data = filter_populated_data(selected_columns_data, ['Invitee Name', 'Invitee Email', 'User Complain', 'Phone Number'])
+
+    # Display the filtered, selected columns
+    st.dataframe(filtered_data, use_container_width=True)   
 
 if __name__ == "__main__":
     main()
