@@ -36,30 +36,23 @@ anim = load_anim("https://lottie.host/81a6ce70-e829-4023-8394-4c659bafe651/HWw7G
 # chatbot embedding 
 def embed_chatbot():
     components.html("""
-<div style="width: 100; height: 0;" id="VG_OVERLAY_CONTAINER">
-    <!-- Here is where Voiceglow renders the widget. -->
-    <!-- Set render to 'full-width' then adjust the width and height to 500px (for example) to render the chatbot itself without the popup. -->
-</div>
-
-<!-- Remove 'defer' if you want widget to load faster (Will affect website loading) -->
-<script defer>
-    (function() {
-        window.VG_CONFIG = {
-            ID: "z6f8rrkg9",
-            region: 'na', // 'eu' or 'na'corresponding to Europe and North America
-            render: 'popup', // popup or full-width
-            stylesheets: [
-                // Base Voiceglow CSS
-                "https://storage.googleapis.com/voiceglow-cdn/vg_live_build/styles.css",
-                // Add your custom css stylesheets, Can also add relative URL ('/public/your-file.css)
-            ],
-        }
-        var VG_SCRIPT = document.createElement("script");
-        VG_SCRIPT.src = "https://storage.googleapis.com/voiceglow-cdn/vg_live_build/vg_bundle.js";
-        document.body.appendChild(VG_SCRIPT);
-    })()
+<script type="text/javascript">
+  (function(d, t) {
+    var v = d.createElement(t), s = d.getElementsByTagName(t)[0];
+    v.onload = function() {
+      window.voiceflow.chat.load({
+        verify: { projectID: '65f8348ce18439e83b8f6611' },
+        url: 'https://general-runtime.voiceflow.com',
+        versionID: 'production'
+      }).then(() => {
+        window.voiceflow.chat.open();
+      });
+    };
+    v.src = "https://cdn.voiceflow.com/widget/bundle.mjs"; v.type = "text/javascript"; s.parentNode.insertBefore(v, s);
+  })(document, 'script');
 </script>
-""", height=800, width=600)
+""", height=800)
+
 
 # main body
 with st.container():
