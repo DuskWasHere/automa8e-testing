@@ -33,7 +33,7 @@ def setup_ui():
     with col2:
         st.markdown("""
             <h1 style='text-align: center;'>User Engagement</h1>
-            <p style='text-align: center;'>This data is a collection of user engagements to gauge unanswered queries.</p>
+            <p style='text-align: center;'><em>This data is a collection of user engagements to gauge unanswered queries.</em></p>
         """, unsafe_allow_html=True)
 
     # The third column is used to balance the layout. No content needed.
