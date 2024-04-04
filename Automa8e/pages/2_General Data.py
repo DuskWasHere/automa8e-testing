@@ -1,61 +1,139 @@
 from PIL import Image
+import pandas as pd
 import streamlit as st
-import requests
-import streamlit.components.v1 as components
-from streamlit_lottie import st_lottie
+import altair as alt
 from streamlit_gsheets import GSheetsConnection
 from utils.google_sheets import handle_data_refresh
 
-st.set_page_config(page_title="Automa8e", layout = "wide", page_icon = "images\page icon.png")
-  
+# Set page configuration
+st.set_page_config(page_title="Automa8e", layout="wide", page_icon="images/page_icon.png")
+
+logo = Image.open("images/logo (6).png")
+st.image(logo, width=200)
+
+# Data fetching with error handling and caching
+@st.cache_data(show_spinner=False)
+def fetch_data(worksheet, usecols=None):
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        data = conn.read(worksheet=worksheet, usecols=usecols)
+        return data
+    except Exception as e:
+        st.error(f"Failed to fetch data: {e}")
+        return pd.DataFrame()
+
+def setup_ui():
+    # Use Streamlit columns to layout the logo and the title + subtitle
+    col1, col2, col3 = st.columns([1, 3, 1])
+
+    # Assuming the logo is not too wide, adjust the width as needed
+    with col1:
+        st.write(" ")
+
+    # Place the title and subtitle in the middle column
+    with col2:
+        st.markdown("""
+            <h1 style='text-align: center;'>General Data Insights</h1>
+            <p style='text-align: center;'><em>Interactive visual representation of data analytics.</em></p>
+        """, unsafe_allow_html=True)
+
+    # The third column is used to balance the layout. No content needed.
+
 handle_data_refresh()
 
-# animation
-def load_anim(url):
-  r = requests.get(url)
-  if r.status_code != 200:
-    return None
-  return r.json()
+def filter_populated_data(df, columns):
+    """Filter the dataframe to include only rows where specified columns are all non-empty."""
+    return df.dropna(subset=columns)
 
-anim = load_anim("https://lottie.host/81a6ce70-e829-4023-8394-4c659bafe651/HWw7G2Fq9p.json")
- 
-# chatbot embedding 
-def embed_chatbot():
-    components.html("""
-<div style="width: 100%; height: 800px; margin: 0; padding: 0;" id="VG_OVERLAY_CONTAINER">
-    <!-- Here is where Voiceglow renders the widget. -->
-    <!-- Set render to 'full-width' then adjust the width and height to 500px (for example) to render the chatbot itself without the popup. -->
-</div>
+def main():
+    setup_ui()
 
-<!-- Remove 'defer' if you want widget to load faster (Will affect website loading) -->
-<script defer>
-    (function() {
-        window.VG_CONFIG = {
-            ID: "b285u5tsg",
-            region: 'na', // 'eu' or 'na' corresponding to Europe and North America
-            render: 'full-width', // Set render to 'full-width' to load chatbot automatically
-            stylesheets: [
-                // Base Voiceglow CSS
-                "https://storage.googleapis.com/voiceglow-cdn/vg_live_build/styles.css",
-                // Add your custom css stylesheets, Can also add relative URL ('/public/your-file.css)
-            ],
-        }
-        var VG_SCRIPT = document.createElement("script");
-        VG_SCRIPT.src = "https://storage.googleapis.com/voiceglow-cdn/vg_live_build/vg_bundle.js";
-        document.body.appendChild(VG_SCRIPT);
-    })()
-</script>
-""", height=800)
+    # Fetching data
+    feedback_data = fetch_data("Feedback", usecols=list(range(2)))
+    engagement_data = fetch_data("UserEngagement")
+    # Assuming you have a way to fetch review_data
+    review_data = fetch_data("Review")
+    ticket_data = fetch_data("Support")
+
+    # Preparing data
+    feedback_summary = feedback_data["Answer Quality"].value_counts().reset_index(name='Count')
+    engagement_main_summary = engagement_data["Main "].value_counts().reset_index(name='Count')
+    engagement_sub_summary = engagement_data["Sub"].value_counts().reset_index(name='Count')
+    # Prepare your review data
+    # Filter review_data for "Sub" being "Negative" or "Positive" and then prepare the summary
+    filtered_review_summary = review_data[review_data['Sub'].isin(['Negative', 'Positive'])]
+
+    # Group by "Main" and "Sub" to get counts
+    review_summary = filtered_review_summary.groupby(['Main', 'Sub']).size().reset_index(name='Count')
+
+    # Row 1: Feedback Summary and Positive/Negative Reviews Visualization
+    col1, col2 = st.columns(2)
     
-# main body
-with st.container():
-  left_column, right_column = st.columns(2)
-  with left_column:
-    st_lottie(anim, speed=1, height=500, width=500, key="automa8e")
+    with col1:
+        st.subheader("Feedback Summary")
+        feedback_chart = alt.Chart(feedback_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Answer Quality'),
+            y=alt.Y('Count:Q', title='Count'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Feedback Overview")
+        st.altair_chart(feedback_chart, use_container_width=True)
 
-  with right_column:
-    def main():
-        embed_chatbot()
+    with col2:
+        st.subheader("Review Summary by Sentiment and Sub Categories")
+        review_chart = alt.Chart(review_summary).mark_bar().encode(
+            x=alt.X('Main:N', title='Sub Category'),
+            y=alt.Y('Count:Q', title='Number of Reviews'),
+            color=alt.Color('Sub:N', legend=alt.Legend(title="Sentiment")),
+            tooltip=['Main', 'Sub', 'Count']
+        ).interactive().properties(title="Reviews Overview")
+        st.altair_chart(review_chart, use_container_width=True)
 
-    if __name__ == "__main__":
-        main()
+    # Row 2: User Engagement - Main Categories Visualization and User Engagement - Sub Categories Visualization
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("User Engagement - Main Categories")
+        main_chart = alt.Chart(engagement_main_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Sub Category'),
+            y=alt.Y('Count:Q', title='Frequency'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Main Categories Distribution")
+        st.altair_chart(main_chart, use_container_width=True)
+
+    with c2:
+        st.subheader("User Engagement - Sub Categories")
+        sub_chart = alt.Chart(engagement_sub_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Sub Category'),
+            y=alt.Y('Count:Q', title='Frequency'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Sub Categories Distribution")
+        st.altair_chart(sub_chart, use_container_width=True)
+        
+    # Row 3: Ticket Management - Main Categories Visualization and Ticket Management - Sub Categories Visualization
+    t1, t2 = st.columns(2)
+    with t1:
+        st.subheader("Ticket Management - Main Categories")
+        main_summary = ticket_data["Main"].value_counts().reset_index(name='Count')
+        main_chart = alt.Chart(main_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Main Category'),
+            y=alt.Y('Count:Q', title='Frequency'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Main Categories Distribution (Ticket)")
+        st.altair_chart(main_chart, use_container_width=True)
+
+    with t2:
+        st.subheader("Ticket Management - Sub Categories")
+        sub_summary = ticket_data["Sub"].value_counts().reset_index(name='Count')
+        sub_chart = alt.Chart(sub_summary).mark_bar().encode(
+            x=alt.X('index:N', title='Sub Category'),
+            y=alt.Y('Count:Q', title='Frequency'),
+            color='index:N',
+            tooltip=['index', 'Count']
+        ).interactive().properties(title="Sub Categories Distribution (Ticket)")
+        st.altair_chart(sub_chart, use_container_width=True) 
+
+if __name__ == "__main__":
+    main()
