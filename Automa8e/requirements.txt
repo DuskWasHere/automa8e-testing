@@ -83,3 +83,4 @@ wcwidth==0.2.13
 wheel==0.41.2
 win-inet-pton
 zipp
+gunicorn
