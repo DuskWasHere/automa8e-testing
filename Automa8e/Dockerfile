@@ -7,8 +7,8 @@ WORKDIR /app/
 
 COPY . /app/.
 
-# Install dependencies using python3.8
-RUN  -m pip install -r requirements.txt
+# Install dependencies using the full path to pip
+RUN /usr/bin/python3.8 -m pip install -r requirements.txt
 
 # Start your application (replace with your command)
-CMD ["streamlit", "run", "Chatbot.py"]
+CMD ["gunicorn", "Chatbot:app"]
