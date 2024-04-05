@@ -1,0 +1,7 @@
+altair==5.3.0
+pandas==1.5.3
+Pillow==10.3.0
+Requests==2.31.0
+st_gsheets_connection==0.0.4
+streamlit==1.31.1
+streamlit_lottie==0.0.5
