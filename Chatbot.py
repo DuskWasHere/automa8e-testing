@@ -31,8 +31,8 @@ def embed_chatbot():
 <script defer>
     (function() {
         window.VG_CONFIG = {
-            ID: "b285u5tsg",
-            region: 'na', // 'eu' or 'na' corresponding to Europe and North America
+            ID: "1dxSPM436L",
+            region: 'na', // 'eu' or 'na'corresponding to Europe and North America
             render: 'full-width', // Set render to 'full-width' to load chatbot automatically
             stylesheets: [
                 // Base Voiceglow CSS
